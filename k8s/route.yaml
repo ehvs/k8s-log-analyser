@@ -1,0 +1,15 @@
+# Route é o recurso nativo do OpenShift para expor serviços (equivale ao Ingress).
+# TLS edge: a terminação TLS acontece no router do OpenShift.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: rag-api
+spec:
+  to:
+    kind: Service
+    name: rag-api
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

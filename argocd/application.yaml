@@ -1,0 +1,22 @@
+# Uma única Application do ArgoCD que reconcilia toda a pasta k8s/.
+# Minimal por design: sem "App of Apps" (seria over-engineering nesta escala).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slm-rag
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ehvs/k8s-log-analyser.git # ajuste para o seu repo
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: slm-rag
+  syncPolicy:
+    automated:
+      prune: true # remove recursos que saírem do Git
+      selfHeal: true # reverte alterações manuais no cluster
+    syncOptions:
+      - CreateNamespace=true

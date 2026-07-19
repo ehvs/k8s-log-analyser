@@ -1,0 +1,32 @@
+# Job de ingestão: gera os embeddings da base e grava no Qdrant.
+# Rode manualmente:  kubectl apply -f k8s/ingest-job.yaml
+# (monte sua base em ./data via ConfigMap/PVC conforme o caso).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rag-ingest
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ingest
+          image: slm-rag-api:latest # mesma imagem da API
+          command: ["python", "ingest.py"]
+          env:
+            - name: EMBED_URL
+              value: http://ramalama-embed:8080
+            - name: QDRANT_URL
+              value: http://qdrant:6333
+            - name: EMBED_MODEL
+              value: nomic-embed-text
+            - name: DATA_DIR
+              value: /data
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          configMap:
+            name: rag-data # kubectl create configmap rag-data --from-file=data/

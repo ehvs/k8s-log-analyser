@@ -1,0 +1,94 @@
+# Observabilidade no OpenShift — usa o User Workload Monitoring nativo do ARO.
+# Habilite-o (uma vez por cluster) antes de aplicar estes manifests:
+#   oc -n openshift-monitoring apply -f <configmap com enableUserWorkload: true>
+# O Prometheus do UWM descobre TODOS os ServiceMonitor dos namespaces de usuário,
+# sem exigir label de release (diferente do kube-prometheus-stack).
+---
+# Prometheus faz scrape da RAG API em /metrics (latência, req/s por rota).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rag-api
+spec:
+  selector:
+    matchLabels:
+      app: rag-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+# Qdrant expõe métricas Prometheus nativamente em /metrics (porta 6333).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: qdrant
+spec:
+  selector:
+    matchLabels:
+      app: qdrant
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+# Dashboard Grafana. No OpenShift, as métricas do UWM já aparecem no console
+# (Observe > Metrics). Este ConfigMap é para quem instala o Grafana Operator da
+# comunidade e o referencia via GrafanaDashboard/dashboard sidecar.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slm-rag-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  slm-rag.json: |
+    {
+      "title": "SLM + RAG — SRE Copilot",
+      "schemaVersion": 39,
+      "editable": true,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "title": "Requisições /ask por segundo",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{handler=\"/ask\"}[5m]))",
+              "legendFormat": "req/s"
+            }
+          ]
+        },
+        {
+          "title": "Latência p95 de /ask (s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=\"/ask\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            }
+          ]
+        },
+        {
+          "title": "Vetores na coleção Qdrant",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            { "expr": "sum(collection_vector_total)", "legendFormat": "vetores" }
+          ]
+        },
+        {
+          "title": "Taxa de erros (5xx) da RAG API",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+              "legendFormat": "5xx/s"
+            }
+          ]
+        }
+      ]
+    }

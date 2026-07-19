@@ -1,0 +1,187 @@
+# RamaLama serve — runtime de inferência do ecossistema Red Hat/containers.
+# Imagem quay.io/ramalama/ramalama expõe uma API compatível com OpenAI na porta 8080.
+# Cada 'serve' sobe UM modelo, então há dois Deployments: geração e embeddings.
+#
+# Dica: a forma canônica de gerar estes manifests é
+#   ramalama serve --generate=kube --name ramalama-llm ollama://llama3.2:3b
+# Ajuste modelo/flags conforme o que você validar no cluster.
+---
+################################  LLM (geração)  ################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: ramalama-llm
+spec:
+  selector:
+    app: ramalama-llm
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ramalama-llm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ramalama-llm
+  strategy:
+    type: Recreate # PVC RWO: um pod por vez
+  template:
+    metadata:
+      labels:
+        app: ramalama-llm
+    spec:
+      containers:
+        - name: ramalama
+          image: quay.io/ramalama/ramalama:latest
+          # --nocontainer: roda o servidor no próprio pod (sem container aninhado).
+          # --store /store: store gravável (o UID aleatório do OpenShift não usa $HOME).
+          args:
+            - "--nocontainer"
+            - "--store"
+            - "/store"
+            - "serve"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8080"
+            - "ollama://llama3.2:3b"
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOME
+              value: /store
+          volumeMounts:
+            - name: store
+              mountPath: /store
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 60 # ~10 min para baixar o modelo
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+      volumes:
+        - name: store
+          persistentVolumeClaim:
+            claimName: ramalama-llm-store
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ramalama-llm-store
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+##############################  Embeddings  ####################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: ramalama-embed
+spec:
+  selector:
+    app: ramalama-embed
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ramalama-embed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ramalama-embed
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ramalama-embed
+    spec:
+      containers:
+        - name: ramalama
+          image: quay.io/ramalama/ramalama:latest
+          args:
+            - "--nocontainer"
+            - "--store"
+            - "/store"
+            - "serve"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8080"
+            - "ollama://nomic-embed-text"
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOME
+              value: /store
+          volumeMounts:
+            - name: store
+              mountPath: /store
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: store
+          persistentVolumeClaim:
+            claimName: ramalama-embed-store
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ramalama-embed-store
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 3Gi
