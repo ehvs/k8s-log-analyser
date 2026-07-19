@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SRE Copilot — SLM + RAG</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="app__header">
+      <h1>SRE Copilot</h1>
+      <p>Assistente SLM + RAG para Kubernetes e runbooks</p>
+    </header>
+
+    <main id="messages" class="messages" aria-live="polite"></main>
+
+    <div id="spinner" class="spinner" hidden>
+      <span class="spinner__dot"></span> pensando…
+    </div>
+
+    <form id="chat-form" class="chat-form" autocomplete="off">
+      <input id="question" name="question" type="text" required
+             placeholder="Pergunte algo sobre Kubernetes/SRE…">
+      <button type="submit">Perguntar</button>
+    </form>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

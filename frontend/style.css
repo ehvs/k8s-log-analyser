@@ -1,0 +1,106 @@
+/* Tema claro/escuro automático, sem framework. */
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1b1f24;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --user: #e7effe;
+  --assistant: #f1f3f5;
+  --error: #fdecec;
+  --error-text: #b42318;
+  --border: #e5e7eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --panel: #161a20;
+    --text: #e6e8eb;
+    --muted: #9aa4b2;
+    --accent: #3b82f6;
+    --user: #1e2a44;
+    --assistant: #1c2127;
+    --error: #3a1d1d;
+    --error-text: #f6a6a6;
+    --border: #2a2f37;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.app__header h1 { margin: 0; font-size: 1.4rem; }
+.app__header p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+
+.messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.msg {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  max-width: 85%;
+  border: 1px solid var(--border);
+}
+.msg--user { align-self: flex-end; background: var(--user); }
+.msg--assistant { align-self: flex-start; background: var(--assistant); }
+.msg--error { align-self: flex-start; background: var(--error); color: var(--error-text); }
+
+.msg__text { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.msg__sources { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
+
+.spinner { color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; }
+.spinner__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+.chat-form {
+  display: flex;
+  gap: 0.5rem;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  padding-top: 0.5rem;
+}
+.chat-form input {
+  flex: 1;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1rem;
+}
+.chat-form button {
+  padding: 0.7rem 1.2rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.chat-form button:disabled { opacity: 0.5; cursor: not-allowed; }
