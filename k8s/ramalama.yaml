@@ -138,6 +138,7 @@ spec:
             - "--store"
             - "/store"
             - "serve"
+            - "--runtime-args=--embeddings" # habilita /v1/embeddings no llama-server
             - "--host"
             - "0.0.0.0"
             - "--port"
