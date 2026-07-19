@@ -46,6 +46,8 @@ spec:
             - "--store"
             - "/store"
             - "serve"
+            - "--ctx-size"
+            - "4096"
             - "--host"
             - "0.0.0.0"
             - "--port"
@@ -79,10 +81,10 @@ spec:
           resources:
             requests:
               cpu: "1"
-              memory: 2Gi
+              memory: 3Gi
             limits:
               cpu: "4"
-              memory: 6Gi
+              memory: 8Gi
       volumes:
         - name: store
           persistentVolumeClaim:
