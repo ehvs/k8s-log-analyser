@@ -1,6 +1,8 @@
 # Job de ingestão: gera os embeddings da base e grava no Qdrant.
-# Rode manualmente:  kubectl apply -f k8s/ingest-job.yaml
-# (monte sua base em ./data via ConfigMap/PVC conforme o caso).
+# FORA do path k8s/ de propósito: NÃO deve ser sincronizado pelo Argo CD.
+# Rode manualmente, sob demanda, DEPOIS de Qdrant/RamaLama prontos e do ConfigMap:
+#   oc -n slm-rag create configmap rag-data --from-file=data/
+#   oc -n slm-rag apply -f jobs/ingest-job.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -12,7 +14,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: ingest
-          image: slm-rag-api:latest # mesma imagem da API
+          image: image-registry.openshift-image-registry.svc:5000/slm-rag/slm-rag-api:latest
           command: ["python", "ingest.py"]
           env:
             - name: EMBED_URL
@@ -29,4 +31,4 @@ spec:
       volumes:
         - name: data
           configMap:
-            name: rag-data # kubectl create configmap rag-data --from-file=data/
+            name: rag-data # oc -n slm-rag create configmap rag-data --from-file=data/

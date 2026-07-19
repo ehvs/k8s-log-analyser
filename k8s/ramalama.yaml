@@ -40,7 +40,8 @@ spec:
           image: quay.io/ramalama/ramalama:latest
           # --nocontainer: roda o servidor no próprio pod (sem container aninhado).
           # --store /store: store gravável (o UID aleatório do OpenShift não usa $HOME).
-          args:
+          command:
+            - "ramalama"
             - "--nocontainer"
             - "--store"
             - "/store"
@@ -129,7 +130,8 @@ spec:
       containers:
         - name: ramalama
           image: quay.io/ramalama/ramalama:latest
-          args:
+          command:
+            - "ramalama"
             - "--nocontainer"
             - "--store"
             - "/store"

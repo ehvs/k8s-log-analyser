@@ -34,6 +34,11 @@ spec:
           image: qdrant/qdrant:latest
           ports:
             - containerPort: 6333
+          env:
+            # snapshots default (./snapshots) cai na raiz read-only sob restricted-v2.
+            # Redireciona para dentro do PVC, que é gravável.
+            - name: QDRANT__STORAGE__SNAPSHOTS_PATH
+              value: /qdrant/storage/snapshots
           volumeMounts:
             - name: storage
               mountPath: /qdrant/storage

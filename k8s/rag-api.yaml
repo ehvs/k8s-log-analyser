@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: rag-api
-          image: slm-rag-api:latest # troque pela sua imagem no registry
+          image: image-registry.openshift-image-registry.svc:5000/slm-rag/slm-rag-api:latest
           ports:
             - containerPort: 8000
           env:

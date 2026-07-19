@@ -1,0 +1,42 @@
+# Concede a SCC nonroot-v2 às ServiceAccounts do Argo CD community.
+#
+# Por quê: o install.yaml upstream fixa runAsUser em alguns componentes
+# (redis=999, dex=1001) com seccompProfile RuntimeDefault. A restricted-v2
+# recusa o UID fixo e a anyuid recusa o seccomp. A nonroot-v2 aceita ambos —
+# qualquer UID não-root + RuntimeDefault — e é mais restrita que a anyuid
+# (não libera root).
+#
+# BOOTSTRAP: aplique fora do fluxo do Argo CD (o Argo CD precisa disto para
+# subir), no namespace onde o Argo CD roda:
+#   oc apply -f bootstrap/argocd-scc.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-nonroot-v2
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:nonroot-v2
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-applicationset-controller
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-dex-server
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-notifications-controller
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-redis
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-repo-server
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-server
+    namespace: argocd

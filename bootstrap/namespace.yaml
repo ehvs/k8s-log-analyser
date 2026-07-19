@@ -1,0 +1,15 @@
+# Namespace do app (bootstrap, aplicado à mão — NÃO sincronizado pelo Argo CD).
+# Fica aqui, e não em k8s/, porque:
+#  1. o build no registry interno (oc new-build -n slm-rag) precisa dele ANTES do sync;
+#  2. protege contra prune — o Argo CD gerencia só os workloads, nunca o namespace
+#     (evita apagar o PVC do Qdrant se a Application/arquivo for removido).
+# Aplicar:  oc apply -f bootstrap/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slm-rag
+  labels:
+    kubernetes.io/metadata.name: slm-rag
+  annotations:
+    openshift.io/display-name: "SLM + RAG — K8s Log Analyser"
+    openshift.io/description: "Assistente SLM+RAG para análise de logs e runbooks de Kubernetes"

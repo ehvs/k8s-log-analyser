@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    kubernetes.io/metadata.name: argocd
+  annotations:
+    openshift.io/display-name: "ArgoCD namespace"
+    openshift.io/description: "Argocd namespace to host the community version"
