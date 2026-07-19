@@ -1,0 +1,55 @@
+# Build declarativo do frontend (S2I com UBI nginx-124), a partir do Git.
+# Substitui o `oc new-build` imperativo — fica versionado e GitOps.
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: frontend
+  namespace: slm-rag
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: frontend
+  namespace: slm-rag
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/ehvs/k8s-log-analyser.git
+      ref: main
+    contextDir: frontend # builda só a pasta frontend/
+  strategy:
+    type: Source # S2I
+    sourceStrategy:
+      from:
+        kind: DockerImage
+        name: registry.access.redhat.com/ubi9/nginx-124:latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: frontend:latest
+  triggers:
+    - type: ConfigChange # dispara o 1º build quando o BuildConfig é criado
+    - type: GitHub # rebuild a cada push no GitHub (precisa do secret + webhook)
+      github:
+        secretReference:
+          name: frontend-github-webhook
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP DO WEBHOOK (uma vez, fora do Git — o repo é público):
+#
+# 1. crie o secret com uma chave aleatória:
+#      oc -n slm-rag create secret generic frontend-github-webhook \
+#        --from-literal=WebHookSecretKey=$(openssl rand -hex 20)
+#
+# 2. pegue a URL do webhook (troque <SECRET> pela chave acima):
+#      oc -n slm-rag describe buildconfig frontend | grep -A2 -i webhook
+#    formato:
+#      https://<API>/apis/build.openshift.io/v1/namespaces/slm-rag/\
+#      buildconfigs/frontend/webhooks/<SECRET>/github
+#
+# 3. no GitHub: repo → Settings → Webhooks → Add webhook
+#      Payload URL = a URL acima  | Content type = application/json
+#
+# Sem o webhook, o build ainda roda no ConfigChange (1º deploy) e você pode
+# forçar rebuilds com:  oc -n slm-rag start-build frontend

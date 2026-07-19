@@ -1,0 +1,176 @@
+# Grafana Operator v5 (community) — instância + datasource (OpenShift UWM) + dashboard.
+# Pré-requisito: o Operator já instalado no namespace grafana-operator.
+# Aplicar:  oc apply -f observability/grafana.yaml
+#
+# Fluxo do datasource no OpenShift: o Grafana NÃO fala com um Prometheus direto;
+# fala com o Thanos Querier do cluster-monitoring, autenticado por um token de SA
+# com o ClusterRole cluster-monitoring-view.
+---
+######################  RBAC + token para ler o UWM  ###########################
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-reader
+  namespace: grafana-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: grafana-reader-monitoring-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view # permite consultar métricas de todos os namespaces
+subjects:
+  - kind: ServiceAccount
+    name: grafana-reader
+    namespace: grafana-operator
+---
+# OCP 4.11+ não cria secret de token automaticamente: este secret anotado força
+# o OpenShift a popular .data.token para a SA grafana-reader.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-reader-token
+  namespace: grafana-operator
+  annotations:
+    kubernetes.io/service-account.name: grafana-reader
+type: kubernetes.io/service-account-token
+---
+##############################  Instância Grafana  #############################
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  namespace: grafana-operator
+  labels:
+    dashboards: "grafana" # este label é o "instanceSelector" usado por datasource/dashboard
+spec:
+  config:
+    log:
+      mode: "console"
+    auth:
+      disable_login_form: "false"
+  # Credenciais admin: se você não definir, o operator gera e guarda no secret
+  # grafana-admin-credentials. Pegue com:
+  #   oc -n grafana-operator get secret grafana-admin-credentials \
+  #     -o jsonpath='{.data.GF_SECURITY_ADMIN_PASSWORD}' | base64 -d; echo
+---
+# Route para acessar a UI (o service criado pelo operator é grafana-service:3000).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: grafana
+  namespace: grafana-operator
+spec:
+  to:
+    kind: Service
+    name: grafana-service
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+############################  Datasource (Thanos/UWM)  #########################
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus-uwm
+  namespace: grafana-operator
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  # injeta o token da SA no header Authorization
+  valuesFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
+        secretKeyRef:
+          name: grafana-reader-token
+          key: token
+  datasource:
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: "15s"
+      tlsSkipVerify: true # simplifica; para produção use o CA do cluster
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      httpHeaderValue1: "Bearer ${token}"
+---
+##################################  Dashboard  ################################
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: slm-rag
+  namespace: grafana-operator
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  json: |
+    {
+      "title": "SLM + RAG — SRE Copilot",
+      "uid": "slm-rag",
+      "schemaVersion": 39,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "title": "Requisições /ask por segundo",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            { "expr": "sum(rate(http_requests_total{namespace=\"slm-rag\", handler=\"/ask\"}[5m]))", "legendFormat": "req/s" }
+          ]
+        },
+        {
+          "title": "Latência p95 de /ask (s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"slm-rag\", handler=\"/ask\"}[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+        {
+          "title": "Taxa de erros 5xx (rag-api)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            { "expr": "sum(rate(http_requests_total{namespace=\"slm-rag\", status=\"5xx\"}[5m]))", "legendFormat": "5xx/s" }
+          ]
+        },
+        {
+          "title": "Requisições por rota",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            { "expr": "sum by (handler) (rate(http_requests_total{namespace=\"slm-rag\"}[5m]))", "legendFormat": "{{handler}}" }
+          ]
+        }
+      ]
+    }
+---
+############  SCC — descomente SE o pod do Grafana falhar por UID fixo  ########
+# A imagem do Grafana roda como UID 472; sob restricted-v2 isso pode ser recusado
+# (mesmo caso do redis do Argo CD). Se o pod não subir por SCC, conceda nonroot-v2.
+# VERIFIQUE o nome da SA:  oc -n grafana-operator get sa
+# (o operator v5 costuma criar "grafana-sa" para a instância chamada "grafana").
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: grafana-nonroot-v2
+#   namespace: grafana-operator
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: system:openshift:scc:nonroot-v2
+# subjects:
+#   - kind: ServiceAccount
+#     name: grafana-sa
+#     namespace: grafana-operator
