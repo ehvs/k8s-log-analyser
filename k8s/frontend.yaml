@@ -61,6 +61,9 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: frontend
+  annotations:
+    # o router corta em 30s por padrão; o SLM em CPU demora mais → sobe p/ 180s
+    haproxy.router.openshift.io/timeout: 180s
 spec:
   to:
     kind: Service
